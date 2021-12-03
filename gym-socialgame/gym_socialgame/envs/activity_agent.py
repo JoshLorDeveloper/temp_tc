@@ -125,8 +125,8 @@ class DemandUnit:
 		self._power_consumption_array = power_consumption_array
 
 	def price_effect_by_time(self, for_times: np.ndarray, for_consumer: ActivityConsumer) -> pd.Series:
-		consumer_price_factor = for_consumer.demand_unit_price_factor
-		consumer_quantity_factor = for_consumer.demand_unit_quantity_factor
+		consumer_price_factor = for_consumer._demand_unit_price_factor
+		consumer_quantity_factor = for_consumer._demand_unit_quantity_factor
 		
 		price_effects = []
 		for start_time_step in for_times:
@@ -143,7 +143,7 @@ class DemandUnit:
 		return pd.Series(price_effects, index=for_times)
 	
 	def absolute_power_consumption_array(self, start_time_step, for_consumer: ActivityConsumer):
-		consumer_quantity_factor = for_consumer.demand_unit_quantity_factor
+		consumer_quantity_factor = for_consumer._demand_unit_quantity_factor
 		power_consumed_by_time = []
 		for time_step_delta, power_consumption in enumerate(self._power_consumption_array):
 			time_step = start_time_step + time_step_delta
