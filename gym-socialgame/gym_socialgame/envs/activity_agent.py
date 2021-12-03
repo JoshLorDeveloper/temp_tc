@@ -42,6 +42,14 @@ class ActivityConsumer:
 									? store in demand unit or activity
 	'''
 
+	def __init__(self, activity_foresights, activity_values, activity_thresholds, consumed_activities, demand_unit_price_factor, demand_unit_quantity_factor):
+		self._activity_foresights = activity_foresights
+		self._activity_values = activity_values
+		self._activity_thresholds = activity_thresholds
+		self._consumed_activities = consumed_activities
+		self._demand_unit_price_factor = demand_unit_price_factor
+		self._demand_unit_quantity_factor = demand_unit_quantity_factor
+
 	def execute_step(self, time_step):
 		to_calculate_for_times = np.array([time_step])
 		for activity, active_value_by_time in self._activity_values.items():
@@ -72,6 +80,12 @@ class Activity:
 		- effect_vectors | a map of ActivityConsumers to a map of Activities to a series of effect values/functions affecting activity values by relative time
 							? can also condition on the time consumed as effect may differ
 	'''
+
+	def __init__(self, demand_units, consumed, effect_vectors):
+		self._demand_units = demand_units
+		self._consumed = consumed
+		self._effect_vectors = effect_vectors
+
 	def price_effect_by_time(self, for_times: np.ndarray, for_consumer: ActivityConsumer) -> pd.Series:
 		total_price_effect = pd.Series(np.full(len(for_times), 0), index=for_times)
 		for demand_unit in self._demand_units:
@@ -106,6 +120,10 @@ class DemandUnit:
 			qualitative differencesare can be handled by different time units and
 			activites
 	'''
+
+	def __init__(self, power_consumption_array):
+		self._power_consumption_array = power_consumption_array
+
 	def price_effect_by_time(self, for_times: np.ndarray, for_consumer: ActivityConsumer) -> pd.Series:
 		consumer_price_factor = for_consumer.demand_unit_price_factor
 		consumer_quantity_factor = for_consumer.demand_unit_quantity_factor
