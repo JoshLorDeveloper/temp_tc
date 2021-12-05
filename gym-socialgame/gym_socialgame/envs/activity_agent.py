@@ -98,7 +98,7 @@ class Activity:
 		effect_vectors_by_activity = self._effect_vectors[by_consumer]
 		for activity, effect_vector in effect_vectors_by_activity.items():
 			# generate effect vector
-			local_effect_vector = np.copy(effect_vector)
+			local_effect_vector = np.copy(effect_vector, subok=True)
 			local_effect_vector.index = local_effect_vector.index + time_step # Add time delta to start time, note: all need to be timestamps and time deltas or all floats
 			# change active values of activity by time for activity consumer
 			active_values_by_time = by_consumer._activity_values[activity]
