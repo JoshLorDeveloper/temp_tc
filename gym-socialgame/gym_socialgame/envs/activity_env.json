@@ -1,0 +1,129 @@
+{
+	"times" : {
+		"start": 0,
+		"stop": 100,
+		"interval": 1
+	},
+	"named_demand_units" : {
+		"I": [ 0.28, 11.9, 16.34, 16.8 ],
+		"II": [17.43, 16.15, 16.23, 15.88],
+		"III": [15.09, 35.6, 123.5, 148.7 ],
+		"IV": [158.49, 149.13, 159.32, 157.62],
+		"V": [158.8, 156.49, 147.04, 70.76],
+		"VI": [42.87, 23.13, 22.52, 16.8]
+	},
+	"activities" : {
+		"a": {
+			"demand_units": [
+				"I", "V", [22.3, 0.5]
+			],
+			"effect_vectors": {
+				"*": { // general consumer
+					"b" : {
+						"*": 0 // general time
+					}
+				}
+			}
+		},
+		"b": {
+			"demand_units": [
+				"I", "V"
+			],
+			"effect_vectors": {
+				"*": { // general consumer
+					"a" : {
+						"*": 0 // general time
+					},
+					"c" : {
+						"*": 2 // general time
+					}
+				}
+			}
+		},
+		"c": {
+			"demand_units": [
+				"II", "III", "IV"
+			],
+			"effect_vectors": {
+				"*": { // general consumer
+					"b" : {
+						"*": 0 // general time
+					},
+					"d" : {
+						"*": 0.5 // general time
+					}
+				}
+			}
+		},
+		"d": {
+			"demand_units": [
+				"II", "VI", [0, 20.4, 6.3]
+			],
+			"effect_vectors": {
+				"*": { // general consumer
+					"c" : {
+						"*": 0 // general time
+					},
+					"a" : {
+						"*": 5 // general time
+					}
+				}
+			}
+		}
+	},
+	"activity_consumers" : {
+		"*": { // general consumer
+			"activity_values": {
+				"*": { // general activitiy
+					"*": 1 // general time
+				}
+			},
+			"activity_thresholds": {
+				"*": { // general activitiy
+					"*": 2 // general time
+				}
+			},
+			"demand_unit_price_factor": {
+				"*": { // general demand_unit
+					"*": 1 // general time
+				}
+			},
+			"demand_unit_quantity_factor": {
+				"*": { // general demand_unit
+					"*": 1 // general time
+				}
+			}
+		},
+		"person_1": {
+			"activity_values": {
+				"b": { 
+					"1": 2
+				},
+				"d": { 
+					"5": 2
+				},
+				"a": { 
+					"12": 2
+				}
+			},
+			"demand_unit_price_factor": {
+				"*": { // general activitiy
+					"*": 2 // general time
+				}
+			}
+		},
+		"person_2": {
+			"activity_values": {
+				"c": { 
+					"3": 2
+				},
+				"d": { 
+					"7": 2
+				},
+				"b": { 
+					"15": 2
+				}
+			}
+		}
+	}
+}
