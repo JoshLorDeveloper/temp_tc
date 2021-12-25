@@ -206,6 +206,7 @@ class JsonActivityEnvironmentGenerator:
 			# finalize setup of activities
 			for activity_name, activity_data in named_activities_data.items():
 
+				# define demand units
 				activity_demand_units = []
 
 				activity_demand_units_data = activity_data["demand_units"]
@@ -217,21 +218,31 @@ class JsonActivityEnvironmentGenerator:
 
 					activity_demand_units.append(demand_unit)
 
-				activity_effect_vectors = []
+				# define effect vectors
+				activity_effect_vectors = {}
 
-				# Create actvity vectors once we know the activity consumers
+				# create actvity vectors once we know the activity consumers
 				activity_effect_vectors_data = activity_data["effect_vectors"]
 
-				# process dynamic
-				dynamic_activity_effect_vector = activity_effect_vectors_data.pop('*', None)
-				JsonActivityEnvironmentGenerator.generalize_map(
-					dynamic_activity_effect_vector, 
-					activity_consumer_list, 
-					activity_effect_vectors, 
-					JsonActivityEnvironmentGenerator.activity_effect_vectors_generation_function(activity_list, times)
-				)
+				# setup functions to run through json data
+				generalize_effect_vector_over_times_function = JsonActivityEnvironmentGenerator.generalize_value_over_time_function(
+																			times
+																		)
 
-				named_activities[activity_name].setup(activity_demand_units)
+				generalize_effect_vector_over_activities_function = JsonActivityEnvironmentGenerator.generalize_value_over_activity_function(
+																			named_activities,
+																			generalize_effect_vector_over_times_function
+																		)
+
+				generalize_effect_vector_over_consumers_function = JsonActivityEnvironmentGenerator.generalize_value_over_consumer_function(
+																			named_activity_consumers, 
+																			generalize_effect_vector_over_activities_function
+																		)
+
+				activity_effect_vectors = generalize_effect_vector_over_consumers_function(activity_effect_vectors_data)
+
+				# setup activity with found information
+				named_activities[activity_name].setup(activity_demand_units, activity_effect_vectors)
 
 			##################
 			##################
@@ -252,7 +263,7 @@ class JsonActivityEnvironmentGenerator:
 
 
 	def activity_effect_vectors_generation_function(activity_list, times):
-		def activity_effect_vectors_function_on_value(value_to_generalize, key):
+		def activity_effect_vectors_function_on_value(value_to_generalize, key = None):
 			to_return = {}
 			# process dynamic
 			dynamic_effect_on_activitiy = value_to_generalize.pop('*', None)
@@ -265,7 +276,7 @@ class JsonActivityEnvironmentGenerator:
 		return activity_effect_vectors_function_on_value	
 	
 	def generalize_value_over_consumer_function(named_consumers, function_on_child_value = None):
-		def generalize_value_over_consumer(consumer_json_data, parent):
+		def generalize_value_over_consumer(consumer_json_data, parent = None):
 
 			consumer_map = JsonActivityEnvironmentGenerator.generalize_over_map_property(consumer_json_data, named_consumers, function_on_child_value)
 			return consumer_map
@@ -273,7 +284,7 @@ class JsonActivityEnvironmentGenerator:
 		return generalize_value_over_consumer
 	
 	def generalize_value_over_activity_function(named_activities, function_on_child_value = None):
-		def generalize_value_over_activity(activity_json_data, parent):
+		def generalize_value_over_activity(activity_json_data, parent = None):
 
 			activity_map = JsonActivityEnvironmentGenerator.generalize_over_map_property(activity_json_data, named_activities, function_on_child_value)
 			return activity_map
@@ -281,7 +292,7 @@ class JsonActivityEnvironmentGenerator:
 		return generalize_value_over_activity
 	
 	def generalize_value_over_demand_unit_function(named_demand_units, function_on_child_value = None):
-		def generalize_value_over_demand_unit(demand_unit_json_data, parent):
+		def generalize_value_over_demand_unit(demand_unit_json_data, parent = None):
 
 			demand_unit_map = JsonActivityEnvironmentGenerator.generalize_over_map_property(demand_unit_json_data, named_demand_units, function_on_child_value)
 			return demand_unit_map
@@ -289,7 +300,7 @@ class JsonActivityEnvironmentGenerator:
 		return generalize_value_over_demand_unit
 
 	def generalize_value_over_time_function(times, function_on_child_value = None):
-		def generalize_value_over_time(time_json_data, parent):
+		def generalize_value_over_time(time_json_data, parent = None):
 
 			time_series = JsonActivityEnvironmentGenerator.generalize_over_series_property(time_json_data, times, function_on_child_value)
 			return time_series
