@@ -83,12 +83,12 @@
 					"*": 2 // general time
 				}
 			},
-			"demand_unit_price_factor": {
+			"demand_unit_price_factors": {
 				"*": { // general demand_unit
 					"*": 1 // general time
 				}
 			},
-			"demand_unit_quantity_factor": {
+			"demand_unit_quantity_factors": {
 				"*": { // general demand_unit
 					"*": 1 // general time
 				}
