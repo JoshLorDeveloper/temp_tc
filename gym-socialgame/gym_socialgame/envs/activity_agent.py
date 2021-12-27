@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from enum import Enum
 from collections.abc import Sequence
-from typing import Union
+from typing import Union, Callable
 import json
 
 class ActivityEnvironment:
@@ -43,18 +43,59 @@ class ActivityConsumer:
 		- consumed_activities   |   Dict from activity to time consumed
 	'''
 
-	def __init__(self, activity_values = {}, activity_thresholds = {}, demand_unit_price_factor = {}, demand_unit_quantity_factor = {}):
-		self._activity_values = activity_values
-		self._activity_thresholds = activity_thresholds
-		self._demand_unit_price_factor = demand_unit_price_factor
-		self._demand_unit_quantity_factor = demand_unit_quantity_factor
+	def __init__(self, activity_values = None, activity_thresholds = None, demand_unit_price_factor = None, demand_unit_quantity_factor = None):
+		
+		if activity_values is None:
+			if not hasattr(self, "_activity_values"):
+				self._activity_values = {}
+		else:
+			self._activity_values = activity_values
+		
+		if activity_thresholds is None:
+			if not hasattr(self, "_activity_thresholds"):
+				self._activity_thresholds = {}
+		else:
+			self._activity_thresholds = activity_thresholds
+		
+		if demand_unit_price_factor is None:
+			if not hasattr(self, "_demand_unit_price_factor"):
+				self._demand_unit_price_factor = {}
+		else:
+			self._demand_unit_price_factor = demand_unit_price_factor
+		
+		if demand_unit_quantity_factor is None:
+			if not hasattr(self, "_demand_unit_quantity_factor"):
+				self._demand_unit_quantity_factor = {}
+		else:
+			self._demand_unit_quantity_factor = demand_unit_quantity_factor
+
 		self._consumed_activities = {}
 
-	def setup(self, activity_values = {}, activity_thresholds = {}, demand_unit_price_factor = {}, demand_unit_quantity_factor = {}):
-		self._activity_values = activity_values
-		self._activity_thresholds = activity_thresholds
-		self._demand_unit_price_factor = demand_unit_price_factor
-		self._demand_unit_quantity_factor = demand_unit_quantity_factor
+	def setup(self, activity_values = None, activity_thresholds = None, demand_unit_price_factor = None, demand_unit_quantity_factor = None):
+		
+		if activity_values is None:
+			if not hasattr(self, "_activity_values"):
+				self._activity_values = {}
+		else:
+			self._activity_values = activity_values
+		
+		if activity_thresholds is None:
+			if not hasattr(self, "_activity_thresholds"):
+				self._activity_thresholds = {}
+		else:
+			self._activity_thresholds = activity_thresholds
+		
+		if demand_unit_price_factor is None:
+			if not hasattr(self, "_demand_unit_price_factor"):
+				self._demand_unit_price_factor = {}
+		else:
+			self._demand_unit_price_factor = demand_unit_price_factor
+		
+		if demand_unit_quantity_factor is None:
+			if not hasattr(self, "_demand_unit_quantity_factor"):
+				self._demand_unit_quantity_factor = {}
+		else:
+			self._demand_unit_quantity_factor = demand_unit_quantity_factor
 
 	def execute_step(self, time_step):
 		to_calculate_for_times = np.array([time_step])
@@ -66,7 +107,7 @@ class ActivityConsumer:
 				if total_value_for_time > threshold_for_time:
 					self.consume(activity)
 
-	def consume(self, time_step, activity: Activity):
+	def consume(self, time_step, activity):
 		self._consumed_activities[activity] = time_step
 		activity.consume(time_step, self)
 
@@ -87,14 +128,32 @@ class Activity:
 		- consumed
 	'''
 	
-	def __init__(self, demand_units = [], effect_vectors = []):
-		self._demand_units = demand_units
-		self._effect_vectors = effect_vectors
+	def __init__(self, demand_units = None, effect_vectors = None):
+		if demand_units is None:
+			if not hasattr(self, "_demand_units"):
+				self._demand_units = []
+		else:
+			self._demand_units = demand_units
+
+		if effect_vectors is None:
+			if not hasattr(self, "_effect_vectors"):
+				self._effect_vectors = {}
+		else:
+			self._effect_vectors = effect_vectors
 		self._consumed = False
 
-	def setup(self, demand_units = [], effect_vectors = []):
-		self._demand_units = demand_units
-		self._effect_vectors = effect_vectors
+	def setup(self, demand_units = None, effect_vectors = None):
+		if demand_units is None:
+			if not hasattr(self, "_demand_units"):
+				self._demand_units = []
+		else:
+			self._demand_units = demand_units
+			
+		if effect_vectors is None:
+			if not hasattr(self, "_effect_vectors"):
+				self._effect_vectors = {}
+		else:
+			self._effect_vectors = effect_vectors
 
 	def price_effect_by_time(self, for_times: np.ndarray, for_consumer: ActivityConsumer) -> pd.Series:
 		total_price_effect = pd.Series(np.full(len(for_times), 0), index=for_times)
@@ -164,12 +223,17 @@ class DemandUnit:
 
 		return pd.Series(power_consumed_by_time, index=absolute_times)
 
+def remove_key_return(original, key, default = None):
+	shallow_copy = dict(original)
+	val = shallow_copy.pop(key, default)
+	return shallow_copy, val
 
 ### ENVIRONMENT GENERATOR
 class JsonActivityEnvironmentGenerator:	
 
 	def generate_environment(json_file_name):
-		with open(json_file_name) as json_file:
+		with open(json_file_name, "r") as json_file:
+
 			json_data = json.load(json_file)
 			
 			# initialize times
@@ -210,7 +274,7 @@ class JsonActivityEnvironmentGenerator:
 			activity_consumer_list = list(named_activity_consumers.values())
 
 			# finalize setup of activities
-			def activity_property_initilization(activity_data, activity):
+			def activity_property_initilization(activity_data, activity, old_activity_data = None):
 				# define demand units
 				activity_demand_units = []
 
@@ -244,7 +308,7 @@ class JsonActivityEnvironmentGenerator:
 																			generalize_effect_vector_over_activities_function
 																		)
 
-				activity_effect_vectors = generalize_effect_vector_over_consumers_function(activity_effect_vectors_data)
+				activity_effect_vectors = generalize_effect_vector_over_consumers_function(activity_effect_vectors_data, old_dict_value = activity._effect_vectors)
 
 				# setup activity with found information
 				activity.setup(activity_demand_units, activity_effect_vectors)
@@ -252,72 +316,83 @@ class JsonActivityEnvironmentGenerator:
 			JsonActivityEnvironmentGenerator.loop_over_value(named_activities_data, named_activities, activity_property_initilization)
 
 			# finalize setup of activity consumers			
-			def activity_consumer_property_initilization(activity_consumer_data, activity_consumer):
-				# define activity values
-				activity_values_data = activity_consumer_data["activity_values"]
-
-				#### setup functions to run through json data
-				generalize_consumer_value_over_times_function = JsonActivityEnvironmentGenerator.series_over_value_function(
-																			times
-																		)
-
-				generalize_consumer_value_over_activities_function = JsonActivityEnvironmentGenerator.dict_over_value_function(
-																			named_activities,
-																			generalize_consumer_value_over_times_function
-																		)
+			def activity_consumer_property_initilization(activity_consumer_data, activity_consumer, old_activity_consumer_data = None):
 				
-				### create property using defined functions
-				activity_values = generalize_consumer_value_over_activities_function(activity_values_data)
+				actvity_consumer_setup_args = {}
+
+				# define activity values
+				if "activity_values" in activity_consumer_data:
+					activity_values_data = activity_consumer_data["activity_values"]
+
+					#### setup functions to run through json data
+					generalize_consumer_value_over_times_function = JsonActivityEnvironmentGenerator.series_over_value_function(
+																				times
+																			)
+
+					generalize_consumer_value_over_activities_function = JsonActivityEnvironmentGenerator.dict_over_value_function(
+																				named_activities,
+																				generalize_consumer_value_over_times_function
+																			)
+					
+					### create property using defined functions
+				
+					actvity_consumer_setup_args["activity_values"] = generalize_consumer_value_over_activities_function(activity_values_data, old_dict_value = activity_consumer._activity_values)
 
 				# define activity thresholds
-				activity_thresholds_data = activity_consumer_data["activity_thresholds"]
+				if "activity_thresholds" in activity_consumer_data:
+					activity_thresholds_data = activity_consumer_data["activity_thresholds"]
 
-				### setup functions to run through json data | First function unnecessary at the moment
-				generalize_consumer_value_over_times_function = JsonActivityEnvironmentGenerator.series_over_value_function(
-																			times
-																		)
+					### setup functions to run through json data | First function unnecessary at the moment
+					generalize_consumer_value_over_times_function = JsonActivityEnvironmentGenerator.series_over_value_function(
+																				times
+																			)
 
-				generalize_consumer_value_over_activities_function = JsonActivityEnvironmentGenerator.dict_over_value_function(
-																			named_activities,
-																			generalize_consumer_value_over_times_function
-																		)
-				### create property using defined functions
-				activity_thresholds = generalize_consumer_value_over_activities_function(activity_thresholds_data)
+					generalize_consumer_value_over_activities_function = JsonActivityEnvironmentGenerator.dict_over_value_function(
+																				named_activities,
+																				generalize_consumer_value_over_times_function
+																			)
+					### create property using defined functions
+					actvity_consumer_setup_args["activity_thresholds"] = generalize_consumer_value_over_activities_function(activity_thresholds_data, old_dict_value = activity_consumer._activity_thresholds)
 
 				# define demand unit price factors
-				demand_unit_price_factors_data = activity_consumer_data["demand_unit_price_factors"]
+				if "demand_unit_price_factors" in activity_consumer_data:
+					demand_unit_price_factors_data = activity_consumer_data["demand_unit_price_factors"]
 
-				### setup functions to run through json data | First function unnecessary at the moment
-				generalize_consumer_value_over_times_function = JsonActivityEnvironmentGenerator.series_over_value_function(
-																			times
-																		)
+					### setup functions to run through json data | First function unnecessary at the moment
+					generalize_consumer_value_over_times_function = JsonActivityEnvironmentGenerator.series_over_value_function(
+																				times
+																			)
 
-				generalize_consumer_value_over_demand_units_function = JsonActivityEnvironmentGenerator.dict_over_value_function(
-																			named_demand_units,
-																			generalize_consumer_value_over_times_function
-																		)
-				### create property using defined functions
-				demand_unit_price_factors = generalize_consumer_value_over_demand_units_function(demand_unit_price_factors_data)
+					generalize_consumer_value_over_demand_units_function = JsonActivityEnvironmentGenerator.dict_over_value_function(
+																				named_demand_units,
+																				generalize_consumer_value_over_times_function
+																			)
+					### create property using defined functions
+					actvity_consumer_setup_args["demand_unit_price_factor"] = generalize_consumer_value_over_demand_units_function(demand_unit_price_factors_data, old_dict_value = activity_consumer._demand_unit_price_factor)
 
 				# define demand unit quantity factors
-				demand_unit_quantity_factors_data = activity_consumer_data["demand_unit_quantity_factors"]
+				if "demand_unit_quantity_factors" in activity_consumer_data:
+					demand_unit_quantity_factors_data = activity_consumer_data["demand_unit_quantity_factors"]
 
-				### setup functions to run through json data | First function unnecessary at the moment
-				generalize_consumer_value_over_times_function = JsonActivityEnvironmentGenerator.series_over_value_function(
-																			times
-																		)
+					### setup functions to run through json data | First function unnecessary at the moment
+					generalize_consumer_value_over_times_function = JsonActivityEnvironmentGenerator.series_over_value_function(
+																				times
+																			)
 
-				generalize_consumer_value_over_demand_units_function = JsonActivityEnvironmentGenerator.dict_over_value_function(
-																			named_demand_units,
-																			generalize_consumer_value_over_demand_units_function
-																		)
-				### create property using defined functions
-				demand_unit_quantity_factors = generalize_consumer_value_over_demand_units_function(demand_unit_quantity_factors_data)
+					generalize_consumer_value_over_demand_units_function = JsonActivityEnvironmentGenerator.dict_over_value_function(
+																				named_demand_units,
+																				generalize_consumer_value_over_times_function
+																			)
+
+					### create property using defined functions
+					actvity_consumer_setup_args["demand_unit_quantity_factor"] = generalize_consumer_value_over_demand_units_function(demand_unit_quantity_factors_data, old_dict_value = activity_consumer._demand_unit_quantity_factor)
 
 				# setup activity consumer with found information
-				activity_consumer.setup(activity_values, activity_thresholds, demand_unit_price_factors, demand_unit_quantity_factors)
+				activity_consumer.setup(**actvity_consumer_setup_args)
 			
 			JsonActivityEnvironmentGenerator.loop_over_value(named_activity_consumers_data, named_activity_consumers, activity_consumer_property_initilization)
+
+			return ActivityEnvironment(activity_list, activity_consumer_list)
 
 	# loops over values in json data and calls function on them | Effectively a map function
 	def loop_over_value(property_json_data, property_name_dict, function_on_child_value = None):
@@ -328,27 +403,31 @@ class JsonActivityEnvironmentGenerator:
 
 	# activites, demand_units, activity_consumers
 	def dict_over_value_function(property_name_dict, function_on_child_value = None):
-		def dict_over_value(property_json_data, parent = None):
+		def dict_over_value(property_json_data, parent = None, old_dict_value = None):
 
-			property_dict = JsonActivityEnvironmentGenerator.over_full_dict_property(property_json_data, property_name_dict, function_on_child_value)
+			property_dict = JsonActivityEnvironmentGenerator.over_full_dict_property(property_json_data, property_name_dict, function_on_child_value, old_dict_value)
 			return property_dict
 
 		return dict_over_value
 
 	# time
 	def series_over_value_function(property_domain, function_on_child_value = None):
-		def series_over_value(property_json_data, parent = None):
+		def series_over_value(property_json_data, parent = None, old_series_value = None):
 
-			property_series = JsonActivityEnvironmentGenerator.over_full_series_property(property_json_data, property_domain, function_on_child_value)
+			property_series = JsonActivityEnvironmentGenerator.over_full_series_property(property_json_data, property_domain, function_on_child_value, old_series_value)
 			return property_series
 
 		return series_over_value
 
 	# activites, demand_units, activity_consumers
-	def over_full_dict_property(object_json_data, named_objects, to_return = {}, function_on_value = None):
+	def over_full_dict_property(object_json_data, named_objects, function_on_value = None, to_return = {}):
 		object_list = list(named_objects.values())
 
-		general_object_data = object_json_data.pop('*', None)
+		if to_return is None:
+			to_return = {} 
+
+		object_json_data, general_object_data = remove_key_return(object_json_data, "*")
+
 		if general_object_data is not None:
 			JsonActivityEnvironmentGenerator.generalize_dict(
 				general_object_data, 
@@ -362,48 +441,54 @@ class JsonActivityEnvironmentGenerator:
 				specific_object = named_objects[specific_object_name]
 
 				if function_on_value is not None:
-					to_return[specific_object] = function_on_value(specific_object_data, specific_object)
+					to_return[specific_object] = function_on_value(specific_object_data, specific_object, to_return.get(specific_object))
 				else:
 					to_return[specific_object] = specific_object_data
 		
 		return to_return
 	
 	# time
-	def over_full_series_property(object_json_data, series_keys_list, function_on_value = None):
+	def over_full_series_property(object_json_data, series_keys_list, function_on_value = None, to_return = None):
 
 		series_values = []
+		
+		object_json_data, general_object_data = remove_key_return(object_json_data, "*")
 
-		general_object_data = object_json_data.pop('*', None)
 		if general_object_data is not None:
+
 			series_values = JsonActivityEnvironmentGenerator.generalize_list(
 				general_object_data, 
 				series_keys_list, 
 				function_on_value
 			)
-		else:
+			
+			to_return = pd.Series(series_values, index=series_keys_list)
+		elif to_return is None:
+
 			series_values = JsonActivityEnvironmentGenerator.generalize_list(
 				None, 
 				series_keys_list
 			)
-
-		to_return = pd.Series(series_values, index=series_keys_list)
+			
+			to_return = pd.Series(series_values, index=series_keys_list)
 
 		for series_key, specific_object_data in object_json_data.items():
-			if series_key in series_keys_list:
+			int_key = int(series_key)
+			if int_key in series_keys_list:
 				if function_on_value is not None:
-					to_return[series_key] = function_on_value(specific_object_data, series_key)
+					to_return[int_key] = function_on_value(specific_object_data, series_key, to_return.get(int_key))
 				else:
-					to_return[series_key] = specific_object_data
+					to_return[int_key] = specific_object_data
 		
 		return to_return
 
 	def generalize_dict(value_to_generalize, generalize_over, to_return = {}, function_on_value = None):
-			for key in generalize_over:
-				if function_on_value is not None:
-					to_return[key] = function_on_value(value_to_generalize, key)
-				else:
-					to_return[key] = value_to_generalize
-			return to_return
+		for key in generalize_over:
+			if function_on_value is not None:
+				to_return[key] = function_on_value(value_to_generalize, key, to_return.get(key))
+			else:
+				to_return[key] = value_to_generalize
+		return to_return
 
 	def generalize_list(value_to_generalize, generalize_over, function_on_value = None):
 		series_values = []
@@ -441,7 +526,19 @@ class ActivityEnvironmentGenerator:
 		activity_consumers = []
 
 
+val = JsonActivityEnvironmentGenerator.generate_environment("gym-socialgame/gym_socialgame/envs/activity_env.json")
+print(val)
+print("Activities")
+for activity in val._activities:
+	demand_units = []
+	for demand_unit in activity._demand_units:
+		demand_units.append(demand_unit._power_consumption_array)
+	print("Activity: ", demand_units)
 
+print("Activity Consumers")
+for activity_consumer in val._activity_consumers:
+	print("Activity Consumer: ", activity_consumer._activity_thresholds)
+		
 
 ### FUTURE WORK
 class SelfDescribedValue:
@@ -463,7 +560,7 @@ class ValueType(Enum):
 
 
 class SelfDescribedValueOperations:
-	def execute(value : Union[float, SelfDescribedValue], action: function, *args, **kwargs):
+	def execute(value : Union[float, SelfDescribedValue], action: Callable, *args, **kwargs):
 		if (type(value) == float):
 			action(value)
 		elif (value.type == ValueType.NUMBER):

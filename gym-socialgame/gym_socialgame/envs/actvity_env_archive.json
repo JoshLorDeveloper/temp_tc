@@ -18,9 +18,9 @@
 				"I", "V", [22.3, 0.5]
 			],
 			"effect_vectors": {
-				"*": {
+				"*": { // general consumer
 					"b" : {
-						"*": 0
+						"*": 0 // general time
 					}
 				}
 			}
@@ -30,12 +30,12 @@
 				"I", "V"
 			],
 			"effect_vectors": {
-				"*": { 
+				"*": { // general consumer
 					"a" : {
-						"*": 0
+						"*": 0 // general time
 					},
 					"c" : {
-						"*": 2
+						"*": 2 // general time
 					}
 				}
 			}
@@ -45,12 +45,12 @@
 				"II", "III", "IV"
 			],
 			"effect_vectors": {
-				"*": {
+				"*": { // general consumer
 					"b" : {
-						"*": 0
+						"*": 0 // general time
 					},
 					"d" : {
-						"*": 0.5
+						"*": 0.5 // general time
 					}
 				}
 			}
@@ -60,37 +60,37 @@
 				"II", "VI", [0, 20.4, 6.3]
 			],
 			"effect_vectors": {
-				"*": {
+				"*": { // general consumer
 					"c" : {
-						"*": 0
+						"*": 0 // general time
 					},
 					"a" : {
-						"*": 5
+						"*": 5 // general time
 					}
 				}
 			}
 		}
 	},
 	"activity_consumers" : {
-		"*": {
+		"*": { // general consumer
 			"activity_values": {
-				"*": {
-					"*": 1
+				"*": { // general activitiy
+					"*": 1 // general time
 				}
 			},
 			"activity_thresholds": {
-				"*": {
-					"*": 2
+				"*": { // general activitiy
+					"*": 2 // general time
 				}
 			},
 			"demand_unit_price_factors": {
-				"*": {
-					"*": 1
+				"*": { // general demand_unit
+					"*": 1 // general time
 				}
 			},
 			"demand_unit_quantity_factors": {
-				"*": {
-					"*": 1
+				"*": { // general demand_unit
+					"*": 1 // general time
 				}
 			}
 		},
@@ -101,11 +101,14 @@
 				},
 				"d": { 
 					"5": 2
+				},
+				"a": { 
+					"12": 2
 				}
 			},
 			"demand_unit_price_factor": {
-				"*": {
-					"*": 2
+				"*": { // general activitiy
+					"*": 2 // general time
 				}
 			}
 		},
