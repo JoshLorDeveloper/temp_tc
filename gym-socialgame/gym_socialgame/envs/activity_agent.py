@@ -18,6 +18,7 @@ class ActivityEnvironment:
 		self._time_domain = time_domain
   
 	def execute(self, energy_price_by_time: pd.Series):
+		energy_price_by_time = energy_price_by_time.subtract(energy_price_by_time.median())
 		for time_step in energy_price_by_time.index:
 			for activity_consumer in self._activity_consumers:
 				activity_consumer.execute_step(energy_price_by_time, time_step)
@@ -164,6 +165,7 @@ class ActivityConsumer:
 		return total_demand
 
 	def restore(self):
+		self._consumed_activities = {}
 		self._activity_values = ActivityConsumer.copy_activity_values(self._initial_activity_values)
 
 	def copy_activity_values(activity_values):
@@ -608,7 +610,7 @@ class ActivityEnvironmentGenerator:
 
 val = JsonActivityEnvironmentGenerator.generate_environment("gym-socialgame/gym_socialgame/envs/activity_env.json")
 times = val._time_domain
-energy_prices = np.random.uniform(low=0.8, high=1.2, size=(len(times),))
+energy_prices = np.random.uniform(low=2, high=3, size=(len(times),))
 energy_prices_by_time = pd.Series(energy_prices, index = times)
 for i in range(1, 100):
 	val.restore_execute_aggregate(energy_prices_by_time)
