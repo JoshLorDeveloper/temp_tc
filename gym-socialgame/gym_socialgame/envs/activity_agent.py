@@ -10,9 +10,27 @@ class Utilities:
 	def special_min(*args):
 		return min(i for i in args if i is not None)
 		
-	def series_add(base : pd.Series, addition : pd.Series):
-		for key, value in base.items():
-			base[key] = value + addition.get(key, default = 0)
+	def series_add(base : np.ndarray, addition : np.ndarray, addition_displacement = 0):
+		for relative_time_step_index, addition_value in enumerate(addition):
+			absolute_time_step_index = relative_time_step_index + addition_displacement
+			if absolute_time_step_index >= len(base):
+				return
+			else:
+				base[absolute_time_step_index] += addition_value
+
+class TimeRange:
+	def __init__(self, start_time_step_index, num_steps = 1):
+		self.start_time_step_index = start_time_step_index
+		self.num_steps = num_steps
+
+	def start_index(self):
+		return self.start_time_step_index
+
+	def __len__(self):
+		return self.num_steps
+	
+	def __contains__(self, time_step_index):
+		return time_step_index >= self.start_index() and time_step_index < self.start_index() + len(self)
 
 class ActivityEnvironment:
 	'''
@@ -26,18 +44,18 @@ class ActivityEnvironment:
 		self._activity_consumers = activity_consumers
 		self._time_domain = time_domain
   
-	def execute(self, energy_price_by_time: pd.Series):
-		energy_price_by_time = energy_price_by_time.subtract(energy_price_by_time.median())
-		for time_step in energy_price_by_time.index:
+	def execute(self, energy_prices: np.ndarray):
+		energy_prices = energy_prices - np.median(energy_prices)
+		for time_step_index in range(len(energy_prices)):
 			for activity_consumer in self._activity_consumers:
-				activity_consumer.execute_step(energy_price_by_time, time_step)
+				activity_consumer.execute_step(energy_prices, time_step_index)
 	
-	def aggregate_demand(self, for_times: np.ndarray = None):
-		if for_times is None:
-			for_times = self._time_domain
+	def aggregate_demand(self, time_range: TimeRange = None):
+		if time_range is None:
+			time_range = self._time_domain
 		demand_by_activity_consumer = {}
 		for activity_consumer in self._activity_consumers:
-			consumer_demand = activity_consumer.aggregate_demand(for_times)
+			consumer_demand = activity_consumer.aggregate_demand(time_range)
 			demand_by_activity_consumer[activity_consumer] = consumer_demand
 		return demand_by_activity_consumer
 
@@ -52,25 +70,24 @@ class ActivityEnvironment:
 		for activity_consumer in self._activity_consumers:
 			activity_consumer.restore()
 
-	def execute_aggregate(self, energy_prices, for_times: np.ndarray = None):
-		if for_times is None:
-			for_times = self._time_domain
-		energy_prices_by_time = pd.Series(energy_prices, index = for_times)
-		self.execute(energy_prices_by_time)
-		result = self.aggregate_demand(for_times)
+	def execute_aggregate(self, energy_prices, time_range: TimeRange = None):
+		if time_range is None:
+			time_range = self._time_domain
+		self.execute(energy_prices)
+		result = self.aggregate_demand(time_range)
 		return result
 
-	def restore_execute_aggregate(self, energy_prices, for_times: np.ndarray = None):
-		if for_times is None:
-			for_times = self._time_domain
+	def restore_execute_aggregate(self, energy_prices, time_range: TimeRange = None):
+		if time_range is None:
+			time_range = self._time_domain
 		self.restore()
-		result = self.execute_aggregate(energy_prices, for_times)
+		result = self.execute_aggregate(energy_prices, time_range)
 		return result
 
 	def build_execute_aggregate(energy_prices, source_file_name = "gym-socialgame/gym_socialgame/envs/activity_env.json"):
 		new_env : ActivityEnvironment = ActivityEnvironment.build(source_file_name)
-		times = new_env._time_domain
-		result = new_env.aggregate_execute(energy_prices, times)
+		time_range = new_env._time_domain
+		result = new_env.aggregate_execute(energy_prices, time_range)
 		return result
 
 	def get_activity_consumers(self):
@@ -153,7 +170,7 @@ class ActivityConsumer:
 			self._demand_unit_quantity_factor = demand_unit_quantity_factor
 
 	def execute_step(self, energy_price_by_time, time_step):
-		to_calculate_for_times = np.array([time_step])
+		to_calculate_for_times = TimeRange(time_step)
 		for activity, active_value_by_time in self._activity_values.items():
 			if (not activity._consumed or activity._consumed is None):
 				price_effect_at_time = activity.price_effect_by_time(energy_price_by_time, to_calculate_for_times, self)
@@ -169,11 +186,11 @@ class ActivityConsumer:
 		self._consumed_activities[activity] = time_step
 		activity.consume(time_step)
 
-	def aggregate_demand(self, for_times: np.ndarray):
-		total_demand = pd.Series(np.full(len(for_times), 0, dtype = np.float64), index=for_times)
+	def aggregate_demand(self, time_range: TimeRange):
+		total_demand = np.zeros(len(time_range), dtype = np.float64)
 		for activity, time_consumed in self._consumed_activities.items():
-			activity_demand = activity.aggregate_demand(time_consumed, for_times, self)
-			Utilities.series_add(total_demand, activity_demand)
+			activity_demand = activity.aggregate_demand(time_consumed, time_range, self)
+			Utilities.series_add(total_demand, activity_demand, time_consumed)
 			# total_demand = total_demand.add(activity_demand, fill_value=0)
 		return total_demand
 
@@ -225,51 +242,45 @@ class Activity:
 		else:
 			self._effect_vectors = effect_vectors
 
-	def price_effect_by_time(self, energy_price_by_time, for_times: np.ndarray, for_consumer: ActivityConsumer) -> pd.Series:
-		if len(for_times) == 1:
+	def price_effect_by_time(self, energy_price_by_time, time_range: TimeRange, for_consumer: ActivityConsumer) -> pd.Series:
+		if len(time_range) == 1:
 			total = 0
 			for demand_unit in self._demand_units:
 				# adds price effect by time to total_price_effect
-				total += demand_unit.price_effect_by_time(energy_price_by_time, for_times, for_consumer)
+				total += demand_unit.price_effect_by_time(energy_price_by_time, time_range, for_consumer)
 			return total
 		else:
-			total_price_effect = pd.Series(np.full(len(for_times), 0), index=for_times)
+			total_price_effect = np.zeros(len(time_range), dtype = np.float64)
 			for demand_unit in self._demand_units:
 				# adds price effect by time to total_price_effect
-				demand_unit.price_effect_by_time(energy_price_by_time, for_times, for_consumer, total_price_effect)
+				demand_unit.price_effect_by_time(energy_price_by_time, time_range, for_consumer, total_price_effect)
 			return total_price_effect
 	
 	def consume(self, time_step):
 		self._consumed = time_step
 		for for_consumer, effect_vectors_by_activity in self._effect_vectors.items():
 			for activity, effect_vector in effect_vectors_by_activity.items():
-				# generate effect vector
-				# local_effect_vector = effect_vector.copy(deep=True)
-				# Add time delta to start time, note: all need to be timestamps and time deltas or all floats
-				# local_effect_vector.index = local_effect_vector.index + time_step
-				# change active values of activity by time for activity consumer
-				active_values_by_time = for_consumer._activity_values[activity]
+				active_values = for_consumer._activity_values[activity]
 				
-				Activity.effect_active_values(time_step, active_values_by_time, effect_vector)
-				# new_active_values_by_time = active_values_by_time * effect_vector # change for increased complexity
+				Activity.effect_active_values(time_step, active_values, effect_vector)
 
-				# for_consumer._activity_values[activity] = new_active_values_by_time
+	def effect_active_values(base_time_step_index, active_values, local_effect_vector):
+		for relative_time_step_index, effect_value in enumerate(local_effect_vector):
+			if effect_value == 1:
+				continue
+			absolute_time_step_index = base_time_step_index + relative_time_step_index
+			if absolute_time_step_index >= len(active_values):
+				return
+			else:
+				active_values[absolute_time_step_index] *= effect_value
+		
 
-	def effect_active_values(time_step, active_values_by_time, local_effect_vector):
-		# new_active_values_by_time = active_values_by_time.copy(deep=True)
-		for active_time, active_value in active_values_by_time.items():
-			effect_time = active_time - time_step
-			effect_val = local_effect_vector.get(effect_time, 1)
-			if effect_val != 1:
-				active_values_by_time[active_time] = active_value * effect_val
-		return active_values_by_time
-
-	def aggregate_demand(self, time_consumed, for_times: np.ndarray, for_consumer: ActivityConsumer):
-		total_demand = pd.Series(np.full(len(for_times), 0, dtype = np.float64), index=for_times)
+	def aggregate_demand(self, time_consumed, time_range: TimeRange, for_consumer: ActivityConsumer):
+		total_demand = np.zeros(len(time_range), dtype = np.float64)
 		for demand_unit in self._demand_units:
 			demand_unit_total_demand = demand_unit.absolute_power_consumption_array(time_consumed, for_consumer)
-			Utilities.series_add(total_demand, demand_unit_total_demand)
-			# total_demand = total_demand.add(demand_unit_total_demand, fill_value=0)
+			Utilities.series_add(total_demand, demand_unit_total_demand, time_consumed)
+			
 		return total_demand
 	
 	def restore(self):
@@ -284,49 +295,44 @@ class DemandUnit:
 			activites
 	'''
 
-	def __init__(self, power_consumption_by_time: pd.Series):
+	def __init__(self, power_consumption_by_time: np.ndarray):
 		self._power_consumption_by_time = power_consumption_by_time
 
-	def price_effect_by_time(self, energy_price_by_time, for_times: np.ndarray, for_consumer: ActivityConsumer, for_return:pd.Series = None) -> pd.Series:
+	def price_effect_by_time(self, energy_price_by_time, time_range: TimeRange, for_consumer: ActivityConsumer, for_return:np.ndarray = None) -> pd.Series:
 
 		consumer_price_factor = for_consumer._demand_unit_price_factor[self]
 		consumer_quantity_factor = for_consumer._demand_unit_quantity_factor[self]
 		
-		if for_return is None and len(for_times) != 1:
-			for_return = pd.Series(np.full(len(for_times), 0), index=for_times)
+		if for_return is None and len(time_range) != 1:
+			for_return = np.zeros(len(time_range), dtype = np.float64)
 
-		time_start = self._power_consumption_by_time.index[0]
-		for start_time_step in for_times:
+		for start_time_step_index_delta in range(len(time_range)):
+			anchour_time_step_index = time_range.start_index() + start_time_step_index_delta
 			total = 0
 
-			for time_step_absolute, power_consumption in self._power_consumption_by_time.items():
-				time_step_delta = time_step_absolute - time_start
-				time_step = start_time_step + time_step_delta
-				if time_step in for_times:
-					power_consumed = power_consumption / consumer_quantity_factor[time_step]
-					effect = power_consumed * energy_price_by_time[time_step] * consumer_price_factor[time_step]
+			for time_step_index_delta, power_consumption in enumerate(self._power_consumption_by_time):
+				time_step_index = anchour_time_step_index + time_step_index_delta
+				if time_step_index in time_range:
+					power_consumed = power_consumption / consumer_quantity_factor[time_step_index]
+					effect = power_consumed * energy_price_by_time[time_step_index] * consumer_price_factor[time_step_index]
 					total = total + effect
 			
-			if len(for_times) == 1:
+			if len(time_range) == 1:
 				return total
-			for_return[start_time_step] += total
+			for_return[start_time_step_index_delta] += total
 		
 		return for_return
 	
-	def absolute_power_consumption_array(self, start_time_step, for_consumer: ActivityConsumer):
+	def absolute_power_consumption_array(self, start_time_step_index, for_consumer: ActivityConsumer):
 		consumer_quantity_factor = for_consumer._demand_unit_quantity_factor[self]
 		power_consumed_by_time = []
-		time_start = self._power_consumption_by_time.index[0]
-		for time_step_absolute, power_consumption in self._power_consumption_by_time.items():
-			time_step_delta = time_step_absolute - time_start
-			time_step = start_time_step + time_step_delta
-			if time_step in consumer_quantity_factor:
-				power_consumed = power_consumption / consumer_quantity_factor[time_step]
+		for time_step_index_delta, power_consumption in enumerate(self._power_consumption_by_time):
+			time_step_index = start_time_step_index + time_step_index_delta
+			if time_step_index in consumer_quantity_factor:
+				power_consumed = power_consumption / consumer_quantity_factor[time_step_index]
 				power_consumed_by_time.append(power_consumed)
 
-		absolute_times = self._power_consumption_by_time.index + start_time_step  - time_start
-
-		return pd.Series(power_consumed_by_time, index=absolute_times[:len(power_consumed_by_time)])
+		return np.array(power_consumed_by_time)
 
 def remove_key_return(original, key, default = None):
 	shallow_copy = dict(original)
