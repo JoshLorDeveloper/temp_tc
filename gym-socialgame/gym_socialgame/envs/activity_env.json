@@ -1,8 +1,7 @@
 {
-    "times": {
-        "start": 1,
-        "stop": 11,
-        "interval": 1
+    "time_range": {
+        "length": 10,
+		"start_index": 0
     },
     "named_demand_units": {
         "262": [
